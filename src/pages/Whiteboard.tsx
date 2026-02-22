@@ -1299,7 +1299,6 @@ function WhiteboardInner() {
             idMap[original.id] = newId;
             const newNode: MachineNode = {
                 ...original, id: newId, parentId,
-                label: original.label + ' (copy)',
                 position: { x: original.position.x + 40, y: original.position.y + 40 },
                 createdAt: new Date(), updatedAt: new Date(),
             };
