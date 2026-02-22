@@ -299,16 +299,41 @@
     color: white;
 }
 
-/* React Flow handles */
+/* React Flow handles — 4 sides */
 .react-flow__handle {
-    width: 10px !important;
-    height: 10px !important;
+    width: 8px !important;
+    height: 8px !important;
     background: #475569 !important;
     border: 2px solid #1e293b !important;
+    opacity: 0.5;
+    transition: all 0.15s;
+}
+
+.machine-node:hover .react-flow__handle {
+    opacity: 1;
 }
 
 .react-flow__handle:hover {
     background: #6366f1 !important;
+    width: 12px !important;
+    height: 12px !important;
+}
+
+/* Stack source/target on same position per side */
+.react-flow__handle[data-handlepos="top"] {
+    top: -4px !important;
+}
+
+.react-flow__handle[data-handlepos="bottom"] {
+    bottom: -4px !important;
+}
+
+.react-flow__handle[data-handlepos="left"] {
+    left: -4px !important;
+}
+
+.react-flow__handle[data-handlepos="right"] {
+    right: -4px !important;
 }
 
 /* ─── Context Menu ─── */

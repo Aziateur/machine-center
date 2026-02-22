@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-02-22 — Cloud Deployment & Node Handles
+
+### Done ✅
+- Ran SQL schema via `psql` (installed libpq) → 11 tables, 6 statuses, all indexes + RLS
+- Initialized git → `Aziateur/machine-center` (public repo)
+- Deployed to Cloudflare Pages via `wrangler pages deploy`
+- Live at: **https://machine-center.pages.dev**
+- Added `.env` with all credentials (DB password, connection string, GitHub repo)
+- Added 4 connection handles per node (top, right, bottom, left)
+- Styled handles: opacity fade-in on hover, grow on hover, stacked source/target
+
+### Tests Run ✅
+- `npx tsc --noEmit` → 0 errors
+- `npm run build` → success
+- Live site verified: dashboard loads, data from Supabase renders, no console errors
+
+### Findings
+- Cloudflare Workers ≠ Cloudflare Pages (user accidentally created Worker first)
+- SSL on deployment-specific URLs (hash.project.pages.dev) takes minutes to provision
+- Main URL (project.pages.dev) works immediately
+- `psql` via direct DB host works; pooler connection requires correct region
+
+---
+
 ## 2026-02-22 — Supabase Migration & B.L.A.S.T. Alignment
 
 ### Done ✅

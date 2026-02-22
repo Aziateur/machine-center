@@ -36,7 +36,15 @@ function MachineNodeComponent({ id, data, selected }: NodeProps & { data: Machin
             style={{ '--node-accent': data.statusColor, '--type-color': typeConfig.color } as React.CSSProperties}
             onClick={() => data.onSelect(id)}
         >
-            <Handle type="target" position={Position.Left} />
+            {/* Connection handles — 4 sides */}
+            <Handle type="target" position={Position.Top} id="top-target" />
+            <Handle type="source" position={Position.Top} id="top-source" />
+            <Handle type="target" position={Position.Right} id="right-target" />
+            <Handle type="source" position={Position.Right} id="right-source" />
+            <Handle type="target" position={Position.Bottom} id="bottom-target" />
+            <Handle type="source" position={Position.Bottom} id="bottom-source" />
+            <Handle type="target" position={Position.Left} id="left-target" />
+            <Handle type="source" position={Position.Left} id="left-source" />
 
             {/* Type badge + status */}
             <div className="machine-node-header">
@@ -133,8 +141,6 @@ function MachineNodeComponent({ id, data, selected }: NodeProps & { data: Machin
                     Enter <ArrowRight size={13} />
                 </button>
             )}
-
-            <Handle type="source" position={Position.Right} />
         </div>
     );
 }
