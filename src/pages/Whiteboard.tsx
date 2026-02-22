@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
-    useReactFlow, MarkerType,
+    useReactFlow, MarkerType, SelectionMode,
     type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
     BackgroundVariant, Panel,
     applyNodeChanges, applyEdgeChanges,
@@ -25,6 +25,11 @@ import {
 } from '../types';
 import { v4 as uuid } from 'uuid';
 import Collapsible from '../components/Collapsible';
+import { useUndoRedo } from '../hooks/useUndoRedo';
+import WhiteboardToolbar from '../components/WhiteboardToolbar';
+import type { ToolMode } from '../components/WhiteboardToolbar';
+import ShortcutsHelp from '../components/ShortcutsHelp';
+import NodeSearch from '../components/NodeSearch';
 import '../styles/whiteboard.css';
 
 // ─── Helpers ───
@@ -32,29 +37,27 @@ import '../styles/whiteboard.css';
 function toFlowNode(
     n: MachineNode, statuses: StatusConfig[],
     problemCounts: Record<string, number>,
-    callbacks: { onDrillDown: (id: string) => void; onSelect: (id: string) => void }
+    callbacks: { onDrillDown: (id: string) => void; onSelect: (id: string) => void; onRename?: (id: string, label: string) => void }
 ): Node {
     const status = statuses.find(s => s.id === n.statusId) ?? statuses[0];
     const stepsDone = (n.steps ?? []).filter(s => s.done).length;
     return {
         id: n.id, type: 'machine', position: n.position,
         data: {
-            label: n.label,
-            nodeType: n.type || 'machine',
-            statusLabel: status?.label ?? 'Unknown',
-            statusColor: status?.color ?? '#6b7280',
-            statusIcon: status?.icon ?? '⚪',
-            goal: n.goal,
-            bottleneck: n.bottleneck || '',
+            label: n.label, nodeType: n.type,
+            statusLabel: status?.label ?? '', statusColor: status?.color ?? '#6b7280',
+            statusIcon: status?.icon ?? '⬜',
+            goal: n.goal || '', bottleneck: n.bottleneck || '',
             notes: n.notes || '',
             hasChildren: n.hasChildren,
             problemCount: problemCounts[n.id] ?? 0,
             missingGoal: n.type === 'machine' && !n.goal,
-            stepsTotal: (n.steps ?? []).length,
-            stepsDone,
+            stepsTotal: (n.steps ?? []).length, stepsDone,
             toolUrl: n.toolUrl || '',
             proficiency: n.proficiency ?? null,
-            ...callbacks,
+            onDrillDown: callbacks.onDrillDown,
+            onSelect: callbacks.onSelect,
+            onRename: callbacks.onRename,
         } satisfies MachineNodeData,
     };
 }
@@ -1073,13 +1076,37 @@ function WhiteboardInner() {
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [editingEdge, setEditingEdge] = useState<{ id: string; label: string; relationship: string } | null>(null);
 
+    // New state for overhaul
+    const [toolMode, setToolMode] = useState<ToolMode>('select');
+    const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+    const [showSearch, setShowSearch] = useState(false);
+    const [clipboard, setClipboard] = useState<{ nodes: MachineNode[]; edges: MachineEdge[] } | null>(null);
+    const spaceHeld = useRef(false);
+
+    // Undo/Redo
+    const { undo, redo, takeSnapshot, canUndo, canRedo } = useUndoRedo(flowNodes, flowEdges, setFlowNodes, setFlowEdges);
+
     const setSearchParamsRef = useRef(setSearchParams);
     setSearchParamsRef.current = setSearchParams;
+
+    // Rename handler
+    const handleRename = useCallback(async (nodeId: string, newLabel: string) => {
+        await db.nodes.update(nodeId, { label: newLabel, updatedAt: new Date() });
+        setDbNodes(prev => prev.map(n => n.id === nodeId ? { ...n, label: newLabel } : n));
+        setFlowNodes(prev => prev.map(n => {
+            if (n.id !== nodeId) return n;
+            return { ...n, data: { ...n.data, label: newLabel } };
+        }));
+    }, []);
 
     const nodeCallbacks = useRef({
         onDrillDown: (nodeId: string) => { setSearchParamsRef.current({ parent: nodeId }); },
         onSelect: (_nodeId: string) => { },
+        onRename: (nodeId: string, newLabel: string) => { handleRename(nodeId, newLabel); },
     });
+
+    // Keep onRename ref up to date
+    useEffect(() => { nodeCallbacks.current.onRename = handleRename; }, [handleRename]);
 
     useEffect(() => { db.statuses.orderBy('order').toArray().then(setStatuses); }, []);
 
@@ -1124,20 +1151,167 @@ function WhiteboardInner() {
         build();
     }, [parentId]);
 
-    // Keyboard shortcuts
+    // Keyboard shortcuts — full overhaul
     useEffect(() => {
-        const h = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'j') { e.preventDefault(); if (selectedNodeId) setShowShortcutOverlay(true); }
+        const onKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+            // Space held = temporary pan
+            if (e.code === 'Space' && !isInput && !e.repeat) {
+                e.preventDefault();
+                spaceHeld.current = true;
+                setToolMode('pan');
+                return;
+            }
+
+            const meta = e.metaKey || e.ctrlKey;
+
+            if (meta && e.key === 'j') { e.preventDefault(); if (selectedNodeId) setShowShortcutOverlay(true); return; }
+            if (meta && e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); return; }
+            if (meta && e.key === 'z') { e.preventDefault(); undo(); return; }
+            if (meta && e.key === 'a' && !isInput) { e.preventDefault(); setFlowNodes(ns => ns.map(n => ({ ...n, selected: true }))); return; }
+            if (meta && e.key === 'f') { e.preventDefault(); setShowSearch(true); return; }
+
+            // Copy
+            if (meta && e.key === 'c' && !isInput) {
+                e.preventDefault();
+                const selectedIds = flowNodes.filter(n => n.selected).map(n => n.id);
+                if (selectedIds.length === 0) return;
+                const copiedNodes = dbNodes.filter(n => selectedIds.includes(n.id));
+                const copiedEdgeIds = flowEdges.filter(ed => selectedIds.includes(ed.source) && selectedIds.includes(ed.target)).map(ed => ed.id);
+                setClipboard({
+                    nodes: copiedNodes,
+                    edges: copiedEdgeIds.map(id => ({ id, parentId, source: flowEdges.find(e => e.id === id)!.source, target: flowEdges.find(e => e.id === id)!.target, relationship: 'feeds' as const })),
+                });
+                return;
+            }
+
+            // Paste
+            if (meta && e.key === 'v' && !isInput && clipboard) {
+                e.preventDefault();
+                handlePaste();
+                return;
+            }
+
+            // Duplicate
+            if (meta && e.key === 'd' && !isInput) {
+                e.preventDefault();
+                const selectedIds = flowNodes.filter(n => n.selected).map(n => n.id);
+                if (selectedIds.length === 0) return;
+                const copiedNodes = dbNodes.filter(n => selectedIds.includes(n.id));
+                const copiedEdgeIds = flowEdges.filter(ed => selectedIds.includes(ed.source) && selectedIds.includes(ed.target));
+                setClipboard({
+                    nodes: copiedNodes,
+                    edges: copiedEdgeIds.map(ed => ({ id: ed.id, parentId, source: ed.source, target: ed.target, relationship: 'feeds' as const })),
+                });
+                setTimeout(() => handlePaste(), 0);
+                return;
+            }
+
+            if (isInput) return; // All below only when not in an input
+
+            if (e.key === 'v' || e.key === 'V') { setToolMode('select'); return; }
+            if (e.key === 'h' || e.key === 'H') { setToolMode('pan'); return; }
+            if (e.key === '?') { setShowShortcutsHelp(prev => !prev); return; }
+            if (e.key === 'Escape') { setFlowNodes(ns => ns.map(n => ({ ...n, selected: false }))); setSelectedNodeId(null); setContextMenu(null); setEditingEdge(null); setShowSearch(false); setShowShortcutsHelp(false); return; }
+            if (e.key === '0') { reactFlowInstance.fitView({ duration: 300 }); return; }
+            if (e.key === '+' || e.key === '=') { e.preventDefault(); setShowAddMenu(true); return; }
         };
-        window.addEventListener('keydown', h);
-        return () => window.removeEventListener('keydown', h);
-    }, [selectedNodeId]);
+
+        const onKeyUp = (e: KeyboardEvent) => {
+            if (e.code === 'Space' && spaceHeld.current) {
+                spaceHeld.current = false;
+                setToolMode('select');
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); };
+    }, [selectedNodeId, flowNodes, flowEdges, dbNodes, clipboard, parentId, undo, redo, reactFlowInstance]);
+
+    // Selected count for toolbar
+    const selectedCount = useMemo(() => flowNodes.filter(n => n.selected).length, [flowNodes]);
 
     const onNodesChange = useCallback((c: NodeChange[]) => setFlowNodes(n => applyNodeChanges(c, n)), []);
     const onEdgesChange = useCallback((c: EdgeChange[]) => setFlowEdges(e => applyEdgeChanges(c, e)), []);
-    const onNodeDragStop = useCallback(async (_: unknown, node: Node) => { await db.nodes.update(node.id, { position: node.position }); }, []);
+    const onNodeDragStop = useCallback(async (_: unknown, node: Node) => {
+        takeSnapshot();
+        await db.nodes.update(node.id, { position: node.position });
+    }, [takeSnapshot]);
     const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => { setSelectedNodeId(node.id); }, []);
     const onPaneClick = useCallback(() => { setSelectedNodeId(null); setContextMenu(null); setEditingEdge(null); }, []);
+
+    // Paste copied nodes
+    const handlePaste = useCallback(async () => {
+        if (!clipboard || clipboard.nodes.length === 0 || !parentId) return;
+        takeSnapshot();
+        const idMap: Record<string, string> = {};
+        const newDbNodes: MachineNode[] = [];
+        const pCounts: Record<string, number> = {};
+        problems.filter(p => p.status !== 'resolved').forEach(p => { pCounts[p.machineNodeId] = (pCounts[p.machineNodeId] ?? 0) + 1; });
+
+        for (const original of clipboard.nodes) {
+            const newId = uuid();
+            idMap[original.id] = newId;
+            const newNode: MachineNode = {
+                ...original, id: newId, parentId,
+                label: original.label + ' (copy)',
+                position: { x: original.position.x + 40, y: original.position.y + 40 },
+                createdAt: new Date(), updatedAt: new Date(),
+            };
+            await db.nodes.add(newNode);
+            newDbNodes.push(newNode);
+        }
+
+        const newEdges: MachineEdge[] = [];
+        for (const original of clipboard.edges) {
+            const newSource = idMap[original.source];
+            const newTarget = idMap[original.target];
+            if (newSource && newTarget) {
+                const newEdge: MachineEdge = { id: uuid(), parentId, source: newSource, target: newTarget, relationship: original.relationship };
+                await db.edges.add(newEdge);
+                newEdges.push(newEdge);
+            }
+        }
+
+        setDbNodes(prev => [...prev, ...newDbNodes]);
+        setFlowNodes(prev => [
+            ...prev.map(n => ({ ...n, selected: false })),
+            ...newDbNodes.map(n => ({ ...toFlowNode(n, statuses, pCounts, nodeCallbacks.current), selected: true })),
+        ]);
+        setFlowEdges(prev => [...prev, ...newEdges.map(e => toFlowEdge(e))]);
+    }, [clipboard, parentId, statuses, problems, takeSnapshot]);
+
+    // Delete all selected nodes
+    const handleDeleteSelected = useCallback(async () => {
+        const selectedIds = flowNodes.filter(n => n.selected).map(n => n.id);
+        if (selectedIds.length === 0) return;
+        takeSnapshot();
+        for (const nodeId of selectedIds) {
+            const children = await db.nodes.where('parentId').equals(nodeId).toArray();
+            for (const c of children) await db.nodes.delete(c.id);
+            await db.edges.filter(e => e.source === nodeId || e.target === nodeId).delete();
+            await db.problems.where('machineNodeId').equals(nodeId).delete();
+            await db.victoryConditions.where('machineNodeId').equals(nodeId).delete();
+            await db.nodes.delete(nodeId);
+            await db.events.add({ id: uuid(), nodeId, eventType: 'node-deleted', timestamp: new Date() } as MachineEvent);
+        }
+        setDbNodes(prev => prev.filter(n => !selectedIds.includes(n.id)));
+        setFlowNodes(prev => prev.filter(n => !selectedIds.includes(n.id)));
+        setFlowEdges(prev => prev.filter(e => !selectedIds.includes(e.source) && !selectedIds.includes(e.target)));
+        setSelectedNodeId(null);
+    }, [flowNodes, takeSnapshot]);
+
+    // Search: zoom to node
+    const handleSearchSelect = useCallback((nodeId: string) => {
+        const node = flowNodes.find(n => n.id === nodeId);
+        if (node) {
+            reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, { zoom: 1.2, duration: 400 });
+            setSelectedNodeId(nodeId);
+        }
+    }, [flowNodes, reactFlowInstance]);
 
     const onEdgeClick = useCallback(async (_: React.MouseEvent, edge: Edge) => {
         const dbEdge = await db.edges.get(edge.id);
@@ -1344,6 +1518,12 @@ function WhiteboardInner() {
                         onEdgeClick={onEdgeClick}
                         onPaneClick={onPaneClick} nodeTypes={nodeTypes}
                         fitView snapToGrid snapGrid={[20, 20]} minZoom={0.1} maxZoom={2}
+                        selectionOnDrag={toolMode === 'select'}
+                        selectionMode={SelectionMode.Partial}
+                        panOnDrag={toolMode === 'pan' ? true : [1, 2]}
+                        panOnScroll
+                        multiSelectionKeyCode="Shift"
+                        deleteKeyCode={null}
                         defaultEdgeOptions={{
                             type: 'smoothstep', animated: true,
                             style: { strokeWidth: 2.5, stroke: '#64748b' },
@@ -1362,13 +1542,37 @@ function WhiteboardInner() {
                             style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                         />
                         <Panel position="top-left" style={{ marginTop: '60px' }}>
-                            <div className="toolbar">
-                                <button className="toolbar-btn" onClick={() => setShowAddMenu(true)} title="Add node">
-                                    <Plus size={18} />
-                                </button>
-                            </div>
+                            <WhiteboardToolbar
+                                mode={toolMode}
+                                onModeChange={setToolMode}
+                                onAddNode={() => setShowAddMenu(true)}
+                                onUndo={undo}
+                                onRedo={redo}
+                                onFitView={() => reactFlowInstance.fitView({ duration: 300 })}
+                                onCopy={() => {
+                                    const selectedIds = flowNodes.filter(n => n.selected).map(n => n.id);
+                                    if (selectedIds.length === 0) return;
+                                    const copiedNodes = dbNodes.filter(n => selectedIds.includes(n.id));
+                                    const copiedEdgeIds = flowEdges.filter(ed => selectedIds.includes(ed.source) && selectedIds.includes(ed.target));
+                                    setClipboard({
+                                        nodes: copiedNodes,
+                                        edges: copiedEdgeIds.map(ed => ({ id: ed.id, parentId, source: ed.source, target: ed.target, relationship: 'feeds' as const })),
+                                    });
+                                }}
+                                onPaste={handlePaste}
+                                onDelete={handleDeleteSelected}
+                                onSearch={() => setShowSearch(true)}
+                                onHelp={() => setShowShortcutsHelp(prev => !prev)}
+                                canUndo={canUndo}
+                                canRedo={canRedo}
+                                hasSelection={selectedCount > 0}
+                            />
                         </Panel>
                     </ReactFlow>
+
+                    {/* Overlays */}
+                    {showShortcutsHelp && <ShortcutsHelp onClose={() => setShowShortcutsHelp(false)} />}
+                    {showSearch && <NodeSearch nodes={dbNodes} onSelect={handleSearchSelect} onClose={() => setShowSearch(false)} />}
 
                     {contextMenu && (
                         <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={e => e.stopPropagation()}>

@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { AlertTriangle, ArrowRight, CheckSquare, ExternalLink } from 'lucide-react';
 import type { NodeType, ProficiencyLevel } from '../../types';
@@ -25,10 +26,35 @@ export interface MachineNodeData {
     // Callbacks
     onDrillDown: (nodeId: string) => void;
     onSelect: (nodeId: string) => void;
+    onRename?: (nodeId: string, newLabel: string) => void;
 }
 
 function MachineNodeComponent({ id, data, selected }: NodeProps & { data: MachineNodeData }) {
     const typeConfig = NODE_TYPE_CONFIG[data.nodeType] || NODE_TYPE_CONFIG.machine;
+    const [editing, setEditing] = useState(false);
+    const [editValue, setEditValue] = useState(data.label);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [editing]);
+
+    const commitRename = useCallback(() => {
+        const trimmed = editValue.trim();
+        if (trimmed && trimmed !== data.label && data.onRename) {
+            data.onRename(id, trimmed);
+        }
+        setEditing(false);
+    }, [editValue, data, id]);
+
+    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditValue(data.label);
+        setEditing(true);
+    }, [data.label]);
 
     return (
         <div
@@ -65,8 +91,26 @@ function MachineNodeComponent({ id, data, selected }: NodeProps & { data: Machin
                 </div>
             </div>
 
-            {/* Name */}
-            <div className="machine-node-label">{data.label}</div>
+            {/* Name — double-click to rename */}
+            {editing ? (
+                <input
+                    ref={inputRef}
+                    className="machine-node-label-input"
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') commitRename();
+                        if (e.key === 'Escape') { setEditValue(data.label); setEditing(false); }
+                        e.stopPropagation();
+                    }}
+                    onClick={e => e.stopPropagation()}
+                />
+            ) : (
+                <div className="machine-node-label" onDoubleClick={handleDoubleClick}>
+                    {data.label}
+                </div>
+            )}
 
             {/* Type-specific content */}
             {data.nodeType === 'machine' && (
