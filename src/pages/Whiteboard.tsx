@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     ReactFlow, ReactFlowProvider, Background, Controls, MiniMap,
-    useReactFlow, MarkerType, SelectionMode,
+    useReactFlow, MarkerType, SelectionMode, ConnectionMode,
     type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
     BackgroundVariant, Panel,
     applyNodeChanges, applyEdgeChanges,
@@ -1565,6 +1565,7 @@ function WhiteboardInner() {
                         multiSelectionKeyCode="Shift"
                         deleteKeyCode={null}
                         edgesFocusable
+                        connectionMode={ConnectionMode.Loose}
                         defaultEdgeOptions={{
                             type: 'smoothstep', animated: true,
                             style: { strokeWidth: 2.5, stroke: '#64748b' },
