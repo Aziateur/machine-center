@@ -68,6 +68,8 @@ function toFlowEdge(e: MachineEdge): Edge {
     const edgeLabel = e.label || rel?.label || '';
     return {
         id: e.id, source: e.source, target: e.target,
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
         label: edgeLabel || undefined,
         type: 'smoothstep', animated: true,
         style: { strokeWidth: 2.5, stroke: color },
@@ -1406,10 +1408,29 @@ function WhiteboardInner() {
 
     const onConnect = useCallback(async (connection: Connection) => {
         if (!connection.source || !connection.target || !parentId) return;
-        const e: MachineEdge = { id: uuid(), parentId, source: connection.source, target: connection.target, relationship: 'feeds' };
+        // Smart handle picking: choose handles based on relative node positions
+        const sourceNode = flowNodes.find(n => n.id === connection.source);
+        const targetNode = flowNodes.find(n => n.id === connection.target);
+        let sourceHandle = connection.sourceHandle || undefined;
+        let targetHandle = connection.targetHandle || undefined;
+
+        if (sourceNode && targetNode && (!sourceHandle || !targetHandle)) {
+            const dx = targetNode.position.x - sourceNode.position.x;
+            const dy = targetNode.position.y - sourceNode.position.y;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                sourceHandle = dx > 0 ? 'right-source' : 'left-source';
+                targetHandle = dx > 0 ? 'left-target' : 'right-target';
+            } else {
+                sourceHandle = dy > 0 ? 'bottom-source' : 'top-source';
+                targetHandle = dy > 0 ? 'top-target' : 'bottom-target';
+            }
+        }
+
+        takeSnapshot();
+        const e: MachineEdge = { id: uuid(), parentId, source: connection.source, target: connection.target, sourceHandle, targetHandle, relationship: 'feeds' };
         await db.edges.add(e);
         setFlowEdges(prev => [...prev, toFlowEdge(e)]);
-    }, [parentId]);
+    }, [parentId, flowNodes, takeSnapshot]);
 
     const handleUpdateNode = useCallback(async (id: string, updates: Partial<MachineNode>) => {
         // Track status changes

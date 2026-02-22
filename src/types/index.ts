@@ -81,6 +81,8 @@ export interface MachineEdge {
   parentId: string;
   source: string;
   target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   label?: string;
   relationship: EdgeRelationship;
 }
