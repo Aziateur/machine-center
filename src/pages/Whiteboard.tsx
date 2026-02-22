@@ -1578,10 +1578,11 @@ function WhiteboardInner() {
                         onEdgeClick={onEdgeClick}
                         onPaneClick={onPaneClick} nodeTypes={nodeTypes}
                         fitView snapToGrid snapGrid={[20, 20]} minZoom={0.1} maxZoom={2}
-                        selectionOnDrag={toolMode === 'select'}
+                        selectionOnDrag
                         selectionMode={SelectionMode.Partial}
-                        panOnDrag={toolMode === 'pan' ? true : [1, 2]}
+                        panOnDrag={toolMode === 'pan' ? [0, 1, 2] : [1, 2]}
                         panOnScroll
+                        selectionKeyCode={toolMode === 'select' ? null : 'Shift'}
                         multiSelectionKeyCode="Shift"
                         deleteKeyCode={null}
                         edgesFocusable

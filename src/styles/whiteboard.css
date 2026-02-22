@@ -301,22 +301,25 @@
 
 /* React Flow handles — 4 sides */
 .react-flow__handle {
-    width: 8px !important;
-    height: 8px !important;
+    width: 10px !important;
+    height: 10px !important;
     background: #475569 !important;
     border: 2px solid #1e293b !important;
-    opacity: 0.5;
+    opacity: 0.4;
     transition: all 0.15s;
+    z-index: 10 !important;
 }
 
 .machine-node:hover .react-flow__handle {
     opacity: 1;
+    background: #6366f1 !important;
 }
 
 .react-flow__handle:hover {
-    background: #6366f1 !important;
-    width: 12px !important;
-    height: 12px !important;
+    background: #818cf8 !important;
+    width: 14px !important;
+    height: 14px !important;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
 }
 
 /* Stack source/target on same position per side */
