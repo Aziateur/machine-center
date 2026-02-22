@@ -1226,10 +1226,25 @@ function WhiteboardInner() {
 
             if (isInput) return; // All below only when not in an input
 
+            // Delete selected nodes + edges
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault();
+                // Delete selected edges from DB
+                const selectedEdgeIds = flowEdges.filter(ed => ed.selected).map(ed => ed.id);
+                if (selectedEdgeIds.length > 0) {
+                    for (const edgeId of selectedEdgeIds) { db.edges.delete(edgeId); }
+                    setFlowEdges(prev => prev.filter(e => !selectedEdgeIds.includes(e.id)));
+                }
+                // Delete selected nodes
+                const selectedNodeIds = flowNodes.filter(n => n.selected).map(n => n.id);
+                if (selectedNodeIds.length > 0) { handleDeleteSelected(); }
+                return;
+            }
+
             if (e.key === 'v' || e.key === 'V') { setToolMode('select'); return; }
             if (e.key === 'h' || e.key === 'H') { setToolMode('pan'); return; }
             if (e.key === '?') { setShowShortcutsHelp(prev => !prev); return; }
-            if (e.key === 'Escape') { setFlowNodes(ns => ns.map(n => ({ ...n, selected: false }))); setSelectedNodeId(null); setContextMenu(null); setEditingEdge(null); setShowSearch(false); setShowShortcutsHelp(false); return; }
+            if (e.key === 'Escape') { setFlowNodes(ns => ns.map(n => ({ ...n, selected: false }))); setFlowEdges(es => es.map(e => ({ ...e, selected: false }))); setSelectedNodeId(null); setContextMenu(null); setEditingEdge(null); setShowSearch(false); setShowShortcutsHelp(false); return; }
             if (e.key === '0') { reactFlowInstance.fitView({ duration: 300 }); return; }
             if (e.key === '+' || e.key === '=') { e.preventDefault(); setShowAddMenu(true); return; }
         };
@@ -1549,10 +1564,12 @@ function WhiteboardInner() {
                         panOnScroll
                         multiSelectionKeyCode="Shift"
                         deleteKeyCode={null}
+                        edgesFocusable
                         defaultEdgeOptions={{
                             type: 'smoothstep', animated: true,
                             style: { strokeWidth: 2.5, stroke: '#64748b' },
                             markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color: '#64748b' },
+                            interactionWidth: 20,
                         }}
                         proOptions={{ hideAttribution: true }}
                     >
