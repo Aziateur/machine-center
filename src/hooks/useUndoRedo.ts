@@ -8,6 +8,11 @@ interface FlowState {
 
 const MAX_HISTORY = 50;
 
+// Safe clone that strips functions (which structuredClone can't handle)
+function safeClone<T>(obj: T): T {
+    return JSON.parse(JSON.stringify(obj));
+}
+
 export function useUndoRedo(
     flowNodes: Node[],
     flowEdges: Edge[],
@@ -25,7 +30,7 @@ export function useUndoRedo(
         const key = JSON.stringify({ n: flowNodes.map(n => ({ id: n.id, x: n.position.x, y: n.position.y })), e: flowEdges.map(e => e.id) });
         if (key === lastSaved.current) return; // skip duplicates
         lastSaved.current = key;
-        setPast(prev => [...prev.slice(-(MAX_HISTORY - 1)), { nodes: structuredClone(flowNodes), edges: structuredClone(flowEdges) }]);
+        setPast(prev => [...prev.slice(-(MAX_HISTORY - 1)), { nodes: safeClone(flowNodes), edges: safeClone(flowEdges) }]);
         setFuture([]);
     }, [flowNodes, flowEdges]);
 
@@ -34,7 +39,7 @@ export function useUndoRedo(
         isUndoRedo.current = true;
         const prev = past[past.length - 1];
         setPast(p => p.slice(0, -1));
-        setFuture(f => [...f, { nodes: structuredClone(flowNodes), edges: structuredClone(flowEdges) }]);
+        setFuture(f => [...f, { nodes: safeClone(flowNodes), edges: safeClone(flowEdges) }]);
         setFlowNodes(prev.nodes);
         setFlowEdges(prev.edges);
         setTimeout(() => { isUndoRedo.current = false; }, 50);
@@ -45,7 +50,7 @@ export function useUndoRedo(
         isUndoRedo.current = true;
         const next = future[future.length - 1];
         setFuture(f => f.slice(0, -1));
-        setPast(p => [...p, { nodes: structuredClone(flowNodes), edges: structuredClone(flowEdges) }]);
+        setPast(p => [...p, { nodes: safeClone(flowNodes), edges: safeClone(flowEdges) }]);
         setFlowNodes(next.nodes);
         setFlowEdges(next.edges);
         setTimeout(() => { isUndoRedo.current = false; }, 50);

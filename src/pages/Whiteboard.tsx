@@ -1084,7 +1084,22 @@ function WhiteboardInner() {
     const spaceHeld = useRef(false);
 
     // Undo/Redo
-    const { undo, redo, takeSnapshot, canUndo, canRedo } = useUndoRedo(flowNodes, flowEdges, setFlowNodes, setFlowEdges);
+    const { undo: rawUndo, redo: rawRedo, takeSnapshot, canUndo, canRedo } = useUndoRedo(flowNodes, flowEdges, setFlowNodes, setFlowEdges);
+
+    // Re-attach callbacks after undo/redo (JSON clone strips functions)
+    const reattachCallbacks = useCallback(() => {
+        setFlowNodes(nodes => nodes.map(n => ({
+            ...n, data: {
+                ...n.data,
+                onDrillDown: nodeCallbacks.current.onDrillDown,
+                onSelect: nodeCallbacks.current.onSelect,
+                onRename: nodeCallbacks.current.onRename,
+            },
+        })));
+    }, []);
+
+    const undo = useCallback(() => { rawUndo(); setTimeout(reattachCallbacks, 60); }, [rawUndo, reattachCallbacks]);
+    const redo = useCallback(() => { rawRedo(); setTimeout(reattachCallbacks, 60); }, [rawRedo, reattachCallbacks]);
 
     const setSearchParamsRef = useRef(setSearchParams);
     setSearchParamsRef.current = setSearchParams;
