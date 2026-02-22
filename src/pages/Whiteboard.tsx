@@ -1146,7 +1146,23 @@ function WhiteboardInner() {
                 pCounts[p.machineNodeId] = (pCounts[p.machineNodeId] ?? 0) + 1;
             });
             setFlowNodes(nodes.map(n => toFlowNode(n, statuses, pCounts, nodeCallbacks.current)));
-            setFlowEdges(edges.map(e => toFlowEdge(e)));
+            // Auto-compute handles from node positions for clean routing
+            const nodeMap = new Map(nodes.map(n => [n.id, n]));
+            setFlowEdges(edges.map(e => {
+                const src = nodeMap.get(e.source);
+                const tgt = nodeMap.get(e.target);
+                if (src && tgt) {
+                    const dx = tgt.position.x - src.position.x;
+                    const dy = tgt.position.y - src.position.y;
+                    const horiz = Math.abs(dx) > Math.abs(dy);
+                    return toFlowEdge({
+                        ...e,
+                        sourceHandle: horiz ? (dx > 0 ? 'right-source' : 'left-source') : (dy > 0 ? 'bottom-source' : 'top-source'),
+                        targetHandle: horiz ? (dx > 0 ? 'left-target' : 'right-target') : (dy > 0 ? 'top-target' : 'bottom-target'),
+                    });
+                }
+                return toFlowEdge(e);
+            }));
         });
     }, [parentId, statuses]);
 
@@ -1426,9 +1442,12 @@ function WhiteboardInner() {
         }
 
         takeSnapshot();
-        const e: MachineEdge = { id: uuid(), parentId, source: connection.source, target: connection.target, sourceHandle, targetHandle, relationship: 'feeds' };
-        await db.edges.add(e);
-        setFlowEdges(prev => [...prev, toFlowEdge(e)]);
+        // Save to DB without handle fields (not in Supabase schema)
+        const dbEdge: MachineEdge = { id: uuid(), parentId, source: connection.source, target: connection.target, relationship: 'feeds' };
+        await db.edges.add(dbEdge);
+        // Display with computed handles
+        const flowEdge = toFlowEdge({ ...dbEdge, sourceHandle, targetHandle });
+        setFlowEdges(prev => [...prev, flowEdge]);
     }, [parentId, flowNodes, takeSnapshot]);
 
     const handleUpdateNode = useCallback(async (id: string, updates: Partial<MachineNode>) => {
