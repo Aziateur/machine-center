@@ -1,0 +1,222 @@
+/* ─── Inbox Page ─── */
+.inbox-page {
+    min-height: 100vh;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.inbox-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.inbox-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.inbox-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.inbox-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 2px 0 0;
+}
+
+.inbox-content {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 28px 20px;
+}
+
+.inbox-loading {
+    padding: 60px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.inbox-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.inbox-empty h3 {
+    color: var(--text-primary);
+    margin: 0;
+    font-size: 20px;
+}
+
+.inbox-empty p {
+    max-width: 360px;
+    line-height: 1.6;
+}
+
+.inbox-empty kbd {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+}
+
+/* ─── Capture Card ─── */
+.inbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.capture-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    transition: all 0.2s;
+}
+
+.capture-card:hover {
+    border-color: var(--border-medium);
+}
+
+.capture-card-text {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.capture-card-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.capture-card-meta strong {
+    color: var(--text-secondary);
+}
+
+.capture-card-target {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.capture-select {
+    flex: 1;
+    min-width: 160px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+}
+
+.capture-select:focus {
+    border-color: var(--accent-blue);
+}
+
+/* ─── Metric Form ─── */
+.capture-metric-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.capture-metric-input {
+    flex: 1;
+    min-width: 100px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+}
+
+.capture-metric-input:focus {
+    border-color: var(--accent-blue);
+}
+
+/* ─── Action Buttons ─── */
+.capture-card-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.capture-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+}
+
+.capture-action-btn:hover {
+    background: var(--bg-card-hover);
+}
+
+.capture-action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.action-problem:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.action-note:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.action-metric:hover {
+    border-color: #8b5cf6;
+    color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.action-dismiss:hover {
+    border-color: #64748b;
+    color: #64748b;
+}
