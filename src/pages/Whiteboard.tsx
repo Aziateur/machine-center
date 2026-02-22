@@ -1234,6 +1234,16 @@ function WhiteboardInner() {
     // Selected count for toolbar
     const selectedCount = useMemo(() => flowNodes.filter(n => n.selected).length, [flowNodes]);
 
+    // Auto-select edges between selected nodes
+    useEffect(() => {
+        const selectedIds = new Set(flowNodes.filter(n => n.selected).map(n => n.id));
+        if (selectedIds.size === 0) return;
+        setFlowEdges(edges => edges.map(e => ({
+            ...e,
+            selected: selectedIds.has(e.source) && selectedIds.has(e.target),
+        })));
+    }, [selectedCount]); // only re-run when selection count changes
+
     const onNodesChange = useCallback((c: NodeChange[]) => setFlowNodes(n => applyNodeChanges(c, n)), []);
     const onEdgesChange = useCallback((c: EdgeChange[]) => setFlowEdges(e => applyEdgeChanges(c, e)), []);
     const onNodeDragStop = useCallback(async (_: unknown, node: Node) => {
